@@ -1,5 +1,5 @@
 ## This script reproduce the results in Table A.2 in the Supplementary Materials
-setwd("/Users/nhdne/Dropbox/ChangePointBin/Code/ICCalibReproduce/")
+
 #### Preparations ####
 
 ## Clean workspace and load packages  
