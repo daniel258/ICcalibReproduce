@@ -12,7 +12,7 @@ library(reshape2)
 library(xtable)
 
 ## Set working directory
-setwd("ICcalibReproduce/PH/Results")
+setwd("Simulations/PH/Results")
 
 
 ## load all txt files amd save in one table/data.frame
@@ -27,17 +27,18 @@ all.files <- list.files()
 all.results.cox <- matrix(nr = 21*1000, nc = 39) # 1000 iterations per simulation scenario, 21 simulations scenarios
 free <- 1  
 j <- 0
+
 for (my.beta0 in all.beta0)
   {
   for (my.n.points in all.n.points)
 {
   j <- j + 1
   cat("j = ", j, "\n")
-  yes <- paste0("CPBcoxBeta",exp(my.beta0),"W",my.n.points,"N",my.n.sample,".RData") %in% all.files
+  yes <- paste0("CPBcoxBeta",exp(my.beta0),"W",my.n.points,"N",my.n.sample,".txt") %in% all.files
   if (yes)
     {
-    load(paste0("CPBcoxBeta",exp(my.beta0),"W",my.n.points,"N",my.n.sample,".RData"))
-    all.results.cox[free:(free+999), ] <- Results 
+    temp <- as.matrix(read.table(paste0("CPBcoxBeta",exp(my.beta0),"W",my.n.points,"N",my.n.sample,".txt")) )
+    all.results.cox[free:(free+999), ] <- temp
     free <- free + 1000
     rm(list=setdiff(ls(), keep.list))
   }
@@ -57,65 +58,55 @@ colnames(all.results.df) <-c("n.sample", "mu", "lambda", "alpha", "beta0", "n.po
 #View(all.results.df) 
 
 ##################################################
-### calculate coverage rates for all methods
+# calculate coverage rates for CI in all methods
 all.results.df$lvcf.in.ci <- (all.results.df$beta0 > all.results.df$lvcf.beta - sqrt(all.results.df$var.beta.lvcf)*1.96) & 
   (all.results.df$beta0 < all.results.df$lvcf.beta + sqrt(all.results.df$var.beta.lvcf)*1.96) 
-
-all.results.df$midI.in.ci <- (all.results.df$beta0 > all.results.df$midI.beta - sqrt(all.results.df$var.beta.midI)*1.96) & 
-  (all.results.df$beta0 < all.results.df$midI.beta + sqrt(all.results.df$var.beta.midI)*1.96) 
 
 all.results.df$cox.in.ci <- (all.results.df$beta0 > all.results.df$cox.beta - sqrt(all.results.df$var.beta.cox)*1.96) & 
                            (all.results.df$beta0 < all.results.df$cox.beta + sqrt(all.results.df$var.beta.cox)*1.96) 
 all.results.df$cox.rs.in.ci <- (all.results.df$beta0 > all.results.df$cox.rs.beta - sqrt(all.results.df$var.beta.cox.rs)*1.96) & 
   (all.results.df$beta0 < all.results.df$cox.rs.beta + sqrt(all.results.df$var.beta.cox.rs)*1.96) 
 mean(all.results.df$lvcf.in.ci, na.rm = T)
-mean(all.results.df$midI.in.ci, na.rm = T)
 mean(all.results.df$cox.in.ci, na.rm = T)
 mean(all.results.df$cox.rs.in.ci, na.rm = T)
 
 ##################################################
 
 #### Summarize Results #####
+# Calculate estimated standard erros from estimated variances
 all.results.df$se.lvcf <- sqrt(all.results.df$var.beta.lvcf)
-all.results.df$se.midI <- sqrt(all.results.df$var.beta.midI) 
 all.results.df$se.cox <- sqrt(all.results.df$var.beta.cox)
 all.results.df$se.cox.rs <- sqrt(all.results.df$var.beta.cox.rs)
 
-melted.est <- all.results.df %>% select(beta0, n.points, lvcf.beta, midI.beta, cox.beta, cox.rs.beta) %>% 
-  melt(id.vars = c("beta0","n.points"))
-# melted.wrong <- melted %>% filter(abs(value)>9)
-# melted.right <- melted %>% filter(abs(value)<9)
-est <- ddply(melted.est, c("beta0", "n.points",  "variable"), summarise,
+# Summarize seprately for mean, se, se.hat and ci
+#  Use "melt()" to change the data format from wide to long
+melted.est <- all.results.df %>% select(beta0, n.points, lvcf.beta, cox.beta, cox.rs.beta) %>%  melt(id.vars = c("beta0","n.points"))
+colnames(melted.est)[3] <- "Method"
+est <- ddply(melted.est, c("beta0", "n.points",  "Method"), summarise,
                MEAN = round(mean(value, na.rm = T),3), EMP.SD = round(sd(value, na.rm = T),3))
 
-melted.se <- all.results.df %>% select(beta0, n.points, se.lvcf, se.midI, se.cox, se.cox.rs)%>%  melt(id.vars = c("beta0","n.points"))
-se <- ddply(melted.se, c("beta0", "n.points",  "variable"), summarise, se = round(mean(value, na.rm = T), 3))
+melted.se <- all.results.df %>% select(beta0, n.points, se.lvcf, se.cox, se.cox.rs)%>%  melt(id.vars = c("beta0","n.points"))
+colnames(melted.se)[3] <- "Method"
+se <- ddply(melted.se, c("beta0", "n.points",  "Method"), summarise, se = round(mean(value, na.rm = T), 3))
 
-melted.ci <- all.results.df %>% select(beta0, n.points, lvcf.in.ci, midI.in.ci, cox.in.ci, cox.rs.in.ci) %>%  melt(id.vars = c("beta0","n.points"))
-ci <- ddply(melted.ci, c("beta0", "n.points",  "variable"), summarise, cp95 = round(mean(value, na.rm = T), 3))
- 
+melted.ci <- all.results.df %>% select(beta0, n.points, lvcf.in.ci, cox.in.ci, cox.rs.in.ci) %>%  melt(id.vars = c("beta0","n.points"))
+colnames(melted.ci)[3] <- "Method"
+ci <- ddply(melted.ci, c("beta0", "n.points",  "Method"), summarise, cp95 = round(mean(value, na.rm = T), 3))
+
+# Put all togather 
 final <- cbind(est, SE = se$se, CP95 = ci$cp95)
-levels(final$variable) <- c("LVCF","MidI", "PHcalib", "PHcalibRS")
+levels(final$Method) <- c("LVCF", "PH-OC", "PH-RSC")
 final$beta0 <- final$beta0 %>%  round(3)
 
+# For Table 2, keep only certain values of beta0 and n.points (Mstar)
 final.pos <- final %>% filter(beta0>=0)
-final.pos
-final.pos %>% filter(n.points<10)
 final.pos.no.10 <- final.pos %>% filter(n.points<10)
 
+# Table 2
 print(xtable(final.pos.no.10, digits = 3), include.rownames =  F)
 
 
 
-final %>% filter(beta0<0)
-final.no.10 <- final %>% filter(n.points<10)
-final.no.10.pos
-final.no.10
 
 
-print(xtable(final.no.10, digits = 2), include.rownames =  F)
 
-# Case numbers/censoring rate
-a <- all.results.df %>% group_by(beta0) %>% summarise(cens.rate = 1-mean(n.cases)/1000) 
-a
-a
