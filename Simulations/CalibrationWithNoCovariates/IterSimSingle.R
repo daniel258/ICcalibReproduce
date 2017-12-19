@@ -137,10 +137,6 @@ IterSimSinglePexp <- function(n.sample, mu, lambda, alpha, beta, n.points, pexp.
   
   
   ###### Calculate beta estimators #######
-  # est.carry <- optimize(f = myF,  tm = obs.tm, event = delta, ps = px.carry, 
-  #                       interval = c(-50,50), maximum = T)$maximum
-  # est.midpoint <- optimize(f = myF,  tm = obs.tm, event = delta, ps = px.midpoint, 
-  #                          interval = c(-50,50), maximum = T)$maximum
   est.weib.calib <- optimize(f = ICcalib:::CoxLogLikX,  tm = obs.tm, event = delta, ps = px, 
                              interval = c(-50,50), maximum = T)$maximum
   est.weib.calib.rs <- optimize(f = ICcalib:::CoxLogLikX,  tm = obs.tm, event = my.data$delta, ps = px.rs, 
@@ -160,7 +156,7 @@ IterSimSinglePexp <- function(n.sample, mu, lambda, alpha, beta, n.points, pexp.
   var.beta.np.rs <- boot.np.rs$v
   boot.ci.np <- boot.np$ci
   boot.ci.np.rs <- boot.np.rs$ci
-  # Returns a lof of things: first row are design parameters, second row are parameter estimates (including Weibull ORC),
+  # Returns a lot of things: first row are design parameters, second row are parameter estimates (including Weibull ORC),
   # third row are variance estimates and (non parametric BS) confidence intervals. CI using estimated variance should be calculated
   # later
   return.vec <- c(n.sample, mu, lambda, alpha, pexp.rates, pexp.ts, beta0, n.points, n.cases, BS,
