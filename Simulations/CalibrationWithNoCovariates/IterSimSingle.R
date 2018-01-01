@@ -1,4 +1,3 @@
-### 
 IterSimSingle <- function(n.sample, mu, lambda, alpha, weib.shape, weib.scale, 
                           beta0, n.points, BS)
 {
@@ -11,51 +10,37 @@ IterSimSingle <- function(n.sample, mu, lambda, alpha, weib.shape, weib.scale,
   w <- my.data$w
   w.res <- my.data$w.res
   #### calculate P(X(t)=1|history) for each person in the risk set, for all risk sets for carry forward and midpoint #######
-  # old version
-  #px.carry <- t(sapply(case.times,CarryForward, w = w, w.res =  w.res))
-  #px.midpoint <- t(sapply(case.times,MidPoint, w = w, w.res =  w.res))
-  # New version
-  df.lvcf <- LVCFdata(w = w, w.res = w.res, obs.tm = obs.tm, delta = delta)
-  df.midI <- MidIdata(w = w, w.res = w.res, obs.tm = obs.tm, delta = delta)
-  
+  df.lvcf <- ICcalib:::LVCFdata(w = w, w.res = w.res, obs.tm = obs.tm, delta = delta)
+  df.midI <- ICcalib:::MidIdata(w = w, w.res = w.res, obs.tm = obs.tm, delta = delta)
   fit.lvcf <- survival::coxph(survival::Surv(start.time, stop.time, delta) ~ X, data = df.lvcf)
   fit.midI <- survival::coxph(survival::Surv(start.time, stop.time, delta) ~ X, data = df.midI)
-  
   est.lvcf <- coef(fit.lvcf)
   est.midI <- coef(fit.midI)
-  
   var.lvcf <- diag(fit.lvcf$var)
   var.midI <- diag(fit.midI$var)
   ##### Fit calibration and risk set calibration models and then calculate P(X(t)=1|history)       ############
   ###### for each person in the risk set, for all risk sets                                        ############
-  
   ### Fit Weibull calibration model 
-  calib.weib.params <- FitCalibWeibull(w = w, w.res = w.res)
+  calib.weib.params <- ICcalib:::FitCalibWeibull(w = w, w.res = w.res)
   px <- t(sapply(case.times,ICcalib:::CalcWeibullCalibP, w = w, w.res =  w.res, weib.params = calib.weib.params))
   # Calculate derivative matrices
   px.deriv.shape <- t(sapply(case.times, ICcalib:::CalcWeibullCalibPderivShape, w = w, w.res =  w.res, weib.params = calib.weib.params))
   px.deriv.scale <- t(sapply(case.times, ICcalib:::CalcWeibullCalibPderivScale, w = w, w.res =  w.res, weib.params = calib.weib.params))
   ### Fit Weibull Risk Set model 
-  calib.rs.params <- FitCalibWeibullRS(w = w, w.res = w.res, tm = obs.tm, event = delta)
+  calib.rs.params <- ICcalib:::FitCalibWeibullRS(w = w, w.res = w.res, tm = obs.tm, event = delta)
   px.rs <- t(sapply(1:n.cases,function(m) {ICcalib:::CalcWeibullRSP(w = w, w.res = w.res, point = case.times[m], weib.params = calib.rs.params[m,])}))
-  
   # Calculate derivative matrices
   px.rs.deriv.shape <- ICcalib:::CalcWeibullCalibPderivShapeRS(w = w, w.res = w.res, obs.tm = obs.tm, event = delta, weib.rs.params = calib.rs.params)
   px.rs.deriv.scale <- ICcalib:::CalcWeibullCalibPderivScaleRS(w = w, w.res = w.res, obs.tm = obs.tm, event = delta, weib.rs.params = calib.rs.params)
-  
   ### Fit Nonparametric calibration model
-  fit.npmle <- FitCalibNpmle(w = w, w.res = w.res)
+  fit.npmle <- ICcalib:::FitCalibNpmle(w = w, w.res = w.res)
   px.np <- t(sapply(case.times, ICcalib:::CalcNpmleCalibP, w = w, w.res =  w.res, fit.npmle = fit.npmle))
   
   ### Fit Nonparametric risk set calibration model
   px.np.rs <- t(sapply(case.times, ICcalib:::CalcNpmleRSP, w = w, w.res =  w.res, obs.tm = obs.tm))
   
   
-  ###### Calculate beta estimators #######
-  # est.carry <- optimize(f = myF,  tm = obs.tm, event = delta, ps = px.carry, 
-  #                          interval = c(-50,50), maximum = T)$maximum
-  # est.midpoint <- optimize(f = myF,  tm = obs.tm, event = delta, ps = px.midpoint, 
-  #                             interval = c(-50,50), maximum = T)$maximum
+  ###### Calculate beta estimates #######
   est.weib.calib <- optimize(f = ICcalib:::CoxLogLikX,  tm = obs.tm, event = delta, ps = px, 
                                 interval = c(-50,50), maximum = T)$maximum
   est.weib.calib.rs <- optimize(f = ICcalib:::CoxLogLikX,  tm = obs.tm, event = my.data$delta, ps = px.rs, 
@@ -75,15 +60,14 @@ IterSimSingle <- function(n.sample, mu, lambda, alpha, weib.shape, weib.scale,
   var.beta.np.rs <- boot.np.rs$v
   boot.ci.np <- boot.np$ci
   boot.ci.np.rs <- boot.np.rs$ci
-  # Returns a lof of things: first row are design parameters, second row are parameter estimates (including Weibull ORC),
-  # third row are variance estimates and (non parametric BS) confidence intervals. CI using estimated variance should be calculated
-  # later
-  return.vec <- c(n.sample, mu, lambda, alpha, weib.shape, weib.scale, beta0, n.points, n.cases, BS,
-                  calib.weib.params, est.lvcf, est.midI, est.weib.calib, est.weib.calib.rs, est.np.calib, est.np.calib.rs,
-                  var.lvcf, var.midI, var.beta.wb, var.beta.wb.rs, var.beta.np, var.beta.np.rs, 
-                  boot.ci.np, boot.ci.np.rs)
+  # Returns a vector
+  return.vec <- c(n.sample, mu, lambda, alpha, weib.shape, weib.scale, beta0, n.points, n.cases, BS, # design parameters
+                  calib.weib.params, est.lvcf, est.midI, est.weib.calib, est.weib.calib.rs, est.np.calib, est.np.calib.rs, # parameter estimates 
+                  var.lvcf, var.midI, var.beta.wb, var.beta.wb.rs, var.beta.np, var.beta.np.rs, # variance estimates 
+                  boot.ci.np, boot.ci.np.rs) #  non parametric BS confidence intervals
   return(return.vec)
 }
+#CI using estimated variance can be calculated when summarizing data
 
 IterSimSinglePexp <- function(n.sample, mu, lambda, alpha, beta, n.points, pexp.rates, pexp.ts, BS)
 {
@@ -96,46 +80,33 @@ IterSimSinglePexp <- function(n.sample, mu, lambda, alpha, beta, n.points, pexp.
   w <- my.data$w
   w.res <- my.data$w.res
   #### calculate P(X(t)=1|history) for each person in the risk set, for all risk sets for carry forward and midpoint #######
-  # old version
-  #px.carry <- t(sapply(case.times,CarryForward, w = w, w.res =  w.res))
-  #px.midpoint <- t(sapply(case.times,MidPoint, w = w, w.res =  w.res))
-  # New version
-  df.lvcf <- LVCFdata(w = w, w.res = w.res, obs.tm = obs.tm, delta = delta)
-  df.midI <- MidIdata(w = w, w.res = w.res, obs.tm = obs.tm, delta = delta)
-  
+  df.lvcf <- ICcalib:::LVCFdata(w = w, w.res = w.res, obs.tm = obs.tm, delta = delta)
+  df.midI <- ICcalib:::MidIdata(w = w, w.res = w.res, obs.tm = obs.tm, delta = delta)
   fit.lvcf <- survival::coxph(survival::Surv(start.time, stop.time, delta) ~ X, data = df.lvcf)
   fit.midI <- survival::coxph(survival::Surv(start.time, stop.time, delta) ~ X, data = df.midI)
-  
   est.lvcf <- coef(fit.lvcf)
   est.midI <- coef(fit.midI)
-  
   var.lvcf <- diag(fit.lvcf$var)
   var.midI <- diag(fit.midI$var)
   ##### Fit calibration and risk set calibration models and then calculate P(X(t)=1|history)       ############
   ###### for each person in the risk set, for all risk sets                                        ############
-  
   ### Fit Weibull calibration model 
-  calib.weib.params <- FitCalibWeibull(w = w, w.res = w.res)
+  calib.weib.params <- ICcalib:::FitCalibWeibull(w = w, w.res = w.res)
   px <- t(sapply(case.times,ICcalib:::CalcWeibullCalibP, w = w, w.res =  w.res, weib.params = calib.weib.params))
   # Calculate derivative matrices
   px.deriv.shape <- t(sapply(case.times,ICcalib:::CalcWeibullCalibPderivShape, w = w, w.res =  w.res, weib.params = calib.weib.params))
   px.deriv.scale <- t(sapply(case.times,ICcalib:::CalcWeibullCalibPderivScale, w = w, w.res =  w.res, weib.params = calib.weib.params))
   ### Fit Weibull Risk Set model 
-  calib.rs.params <- FitCalibWeibullRS(w = w, w.res = w.res, tm = obs.tm, event = delta)
+  calib.rs.params <- ICcalib:::FitCalibWeibullRS(w = w, w.res = w.res, tm = obs.tm, event = delta)
   px.rs <- t(sapply(1:n.cases,function(m) {ICcalib:::CalcWeibullRSP(w = w, w.res = w.res, point = case.times[m], weib.params = calib.rs.params[m,])}))
-  
   # Calculate derivative matrices
   px.rs.deriv.shape <- ICcalib:::CalcWeibullCalibPderivShapeRS(w = w, w.res = w.res, obs.tm = obs.tm, event = delta, weib.rs.params = calib.rs.params)
   px.rs.deriv.scale <- ICcalib:::CalcWeibullCalibPderivScaleRS(w = w, w.res = w.res, obs.tm = obs.tm, event = delta, weib.rs.params = calib.rs.params)
-  
   ### Fit Nonparametric calibration model
-  fit.npmle <- FitCalibNpmle(w = w, w.res = w.res)
+  fit.npmle <- ICcalib:::FitCalibNpmle(w = w, w.res = w.res)
   px.np <- t(sapply(case.times, ICcalib:::CalcNpmleCalibP, w = w, w.res =  w.res, fit.npmle = fit.npmle))
-  
   ### Fit Nonparametric risk set calibration model
   px.np.rs <- t(sapply(case.times, ICcalib:::CalcNpmleRSP, w = w, w.res =  w.res, obs.tm = obs.tm))
-  
-  
   ###### Calculate beta estimators #######
   est.weib.calib <- optimize(f = ICcalib:::CoxLogLikX,  tm = obs.tm, event = delta, ps = px, 
                              interval = c(-50,50), maximum = T)$maximum
@@ -156,12 +127,11 @@ IterSimSinglePexp <- function(n.sample, mu, lambda, alpha, beta, n.points, pexp.
   var.beta.np.rs <- boot.np.rs$v
   boot.ci.np <- boot.np$ci
   boot.ci.np.rs <- boot.np.rs$ci
-  # Returns a lot of things: first row are design parameters, second row are parameter estimates (including Weibull ORC),
-  # third row are variance estimates and (non parametric BS) confidence intervals. CI using estimated variance should be calculated
-  # later
-  return.vec <- c(n.sample, mu, lambda, alpha, pexp.rates, pexp.ts, beta0, n.points, n.cases, BS,
-                  calib.weib.params, est.lvcf, est.midI, est.weib.calib, est.weib.calib.rs, est.np.calib, est.np.calib.rs, 
-                  var.lvcf, var.midI, var.beta.wb, var.beta.wb.rs, var.beta.np, var.beta.np.rs, 
-                  boot.ci.np, boot.ci.np.rs)
+  # Returns a vector
+  return.vec <- c(n.sample, mu, lambda, alpha, pexp.rates, pexp.ts, beta0, n.points, n.cases, BS, # design parameters
+                  calib.weib.params, est.lvcf, est.midI, est.weib.calib, est.weib.calib.rs, est.np.calib, est.np.calib.rs, # parameter estimates
+                  var.lvcf, var.midI, var.beta.wb, var.beta.wb.rs, var.beta.np, var.beta.np.rs, # Variance estimates
+                  boot.ci.np, boot.ci.np.rs)  #  non parametric BS confidence intervals
   return(return.vec)
 }
+#CI using estimated variance can be calculated when summarizing data

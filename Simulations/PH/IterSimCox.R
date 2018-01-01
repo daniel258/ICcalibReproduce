@@ -1,7 +1,3 @@
-### 
-
-### 29 June 17 - added SE calculations for carry and midI
-## 21 Sep 17 -- added compatability with the revised ICcalib package
 IterSimCox <- function(n.sample, mu, lambda, alpha, beta0, n.points, gamma.z, gamma.q, pts.for.ints, n.int = 5, order = 2)
 {
   my.data <- ICcalib:::SimCoxIntervalCensCox(n.sample = n.sample, mu = mu, lambda = lambda, alpha = alpha, gamma.z = gamma.z, gamma.q = gamma.q,
@@ -14,31 +10,24 @@ IterSimCox <- function(n.sample, mu, lambda, alpha, beta0, n.points, gamma.z, ga
   n.cases <- length(case.times)
   w <- my.data$w
   w.res <- my.data$w.res
-  
   ##### Naive methods ########
-  
   #### Create data frame with time-dependent covariate suitable for coxph (for naive methods, see LVCFdata and MIdIdata) #######
-  
-  df.lvcf <- LVCFdata(w = w, w.res = w.res, obs.tm = obs.tm, delta = delta, Z = Z)
-  df.midI <- MidIdata(w = w, w.res = w.res, obs.tm = obs.tm, delta = delta, Z = Z)
-  
+  df.lvcf <- ICcalib:::LVCFdata(w = w, w.res = w.res, obs.tm = obs.tm, delta = delta, Z = Z)
+  df.midI <- ICcalib:::MidIdata(w = w, w.res = w.res, obs.tm = obs.tm, delta = delta, Z = Z)
   fit.lvcf <- survival::coxph(survival::Surv(start.time, stop.time, delta) ~ X + Z1 + Z2 + Z3, data = df.lvcf)
   fit.midI <- survival::coxph(survival::Surv(start.time, stop.time, delta) ~ X + Z1 + Z2 + Z3, data = df.midI)
-  
   est.lvcf <- coef(fit.lvcf)
   est.midI <- coef(fit.midI)
-  
   var.lvcf <- diag(fit.lvcf$var)
   var.midI <- diag(fit.midI$var)
-  
   ##### Fit calibration and risk set calibration models and then calculate P(X(t)=1|history)       ############
   ###### for each person in the risk set, for all risk sets                                        ############
   cox.hz.times <- sort(unique(obs.tm))
-  fit.cox <- tryCatch(FitCalibCox(w = w, w.res = w.res, Q = Q, hz.times = cox.hz.times, n.int = n.int, order = order), error = function(e){e})
+  fit.cox <- tryCatch(ICcalib:::FitCalibCox(w = w, w.res = w.res, Q = Q, hz.times = cox.hz.times, n.int = n.int, order = order), error = function(e){e})
   fit.cox.fail <- 0
   if(inherits(fit.cox, "error")){ fit.cox.fail <- 1 }
   n.fits <- length(pts.for.ints)
-  fit.cox.rs.ints <- tryCatch(FitCalibCoxRSInts(w = w, w.res = w.res, Q = Q, hz.times = cox.hz.times, tm = obs.tm, event = delta, 
+  fit.cox.rs.ints <- tryCatch(ICcalib:::FitCalibCoxRSInts(w = w, w.res = w.res, Q = Q, hz.times = cox.hz.times, tm = obs.tm, event = delta, 
                                                 pts.for.ints = pts.for.ints, n.int = n.int, order = order),           error = function(e){e})
   fit.cox.rs.ints.fail <- 0 
   if(inherits(fit.cox.rs.ints, "error")){ fit.cox.rs.ints.fail <- 1 } else {
@@ -61,7 +50,6 @@ IterSimCox <- function(n.sample, mu, lambda, alpha, beta0, n.points, gamma.z, ga
     var.cox <- diag(ICcalib:::CalcVarParam(theta = est.cox, tm = obs.tm, event = delta, Z = Z, Q = Q,
                             ps = px.cox, ps.deriv = px.cox.deriv, w = w, w.res = w.res, fit.cox = fit.cox))
     }}
-  ##
   est.cox.rs.fail <- 0
   if (fit.cox.rs.ints.fail==0) {
   px.cox.rs.ints <- t(sapply(case.times, ICcalib:::CalcCoxCalibRSIntsP, w = w, w.res =  w.res, fit.cox.rs.ints = fit.cox.rs.ints, 
@@ -80,14 +68,11 @@ IterSimCox <- function(n.sample, mu, lambda, alpha, beta0, n.points, gamma.z, ga
     var.cox.rs <- diag(var.cox.rs.ints)
     }
   }
-  ###
-  
-  
-  # Returns a lot of things: first row are design parameters, second row are parameter estimates 
-  # third row are variance estimates, CI using estimated variance can be calculated when summarizing data
-  return.vec <- c(n.sample, mu, lambda, alpha,  beta0, n.points, n.cases, 
-                  est.lvcf, est.midI, est.cox, est.cox.rs,
-                  var.lvcf, var.midI, var.cox, var.cox.rs)
+  # Returns a vector
+  return.vec <- c(n.sample, mu, lambda, alpha,  beta0, n.points, n.cases, # design parameters
+                  est.lvcf, est.midI, est.cox, est.cox.rs, # parameter estimates 
+                  var.lvcf, var.midI, var.cox, var.cox.rs) #variance estimates
+  #CI using estimated variance can be calculated when summarizing data
   return(return.vec)
 }
 
