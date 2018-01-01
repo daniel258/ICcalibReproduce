@@ -7,7 +7,10 @@
 
 rm(list = ls())
 
+devtools::install_github("daniel258/ICcalib")
 library(ICcalib)
+packageVersion("ICcalib")
+#[1] ‘1.0.5’
 library(xtable)
 library(dplyr)
 
@@ -54,7 +57,7 @@ cmv.data %>% select(cmvdiag) %>% sum  # [1] 37
 # For blood and urn shedding, create left and right time points.
 # Replace NA with Inf for right points of the interval, and replace NA with zero for left side of the interval
 # For time-to-cmv-diagnosis, use diagnoisis date if cmvdiag==1 (cases) and end of study if cmvdiag==0 (event-free participants)
-cmv.data <- cmv.data %>% mutate(bld.lft =  ifelse(is.na(bldnegdt), 0, ((bldnegdt - startrx)/30)),
+cmv.data <- cmv.data %>% dplyr::mutate(bld.lft =  ifelse(is.na(bldnegdt), 0, ((bldnegdt - startrx)/30)),
                               bld.rgt =  ifelse(is.na(bldposdt), Inf ,((bldposdt - startrx)/30)),
                               urn.lft =  ifelse(is.na(urnnegdt), 0, ((urnnegdt - startrx)/30)),
                               urn.rgt =  ifelse(is.na(urnposdt), Inf, ((urnposdt- startrx)/30)),
@@ -86,15 +89,15 @@ delta <- cmv.data$cmvdiag
 ######### Analysis of  CMV **blood** shedding and CMV diagnosis ##########
 
 # Create datasets for the naive methods
-df.lvcf.bld <-   LVCFdata(w = w.bld, w.res = w.res.bld, obs.tm = obs.tm, delta = delta)
-df.midI.bld <-   MidIdata(w = w.bld, w.res = w.res.bld, obs.tm = obs.tm, delta = delta)
+df.lvcf.bld <-   ICcalib:::LVCFdata(w = w.bld, w.res = w.res.bld, obs.tm = obs.tm, delta = delta)
+df.midI.bld <-   ICcalib:::MidIdata(w = w.bld, w.res = w.res.bld, obs.tm = obs.tm, delta = delta)
 
 # LVCF +  MidI model fitting
 fit.lvcf.bld <- survival::coxph(survival::Surv(start.time, stop.time, delta) ~ X, data = df.lvcf.bld)
 fit.midI.bld <- survival::coxph(survival::Surv(start.time, stop.time, delta) ~ X, data = df.midI.bld)
 
 ## Nonparametric calibration model
-fit.npmle.bld <- FitCalibNpmle(w = w.bld, w.res = w.res.bld)
+fit.npmle.bld <- ICcalib::FitCalibNpmle(w = w.bld, w.res = w.res.bld)
 
 ## Calculate probability matrices. These matrices represent P(X(t)=1|history) using different estimators.
 # Number of rows: number of cases , number of columns: sample size. So these probabilities are calculated for all the sample at each case time
@@ -111,8 +114,8 @@ all.est.bld <- c(est.lvcf.bld, est.midI.bld, est.np.bld, est.np.calib.rs.bld)
 all.est.bld %>% round(2)
 
 ### SE, p-values, CIs, and final results' table 
-boot.np.bld <- ICcalib:::CalcVarNpmle(tm = obs.tm, event = delta, w = w.bld , w.res = w.res.bld, BS = 1000)
-boot.np.rs.bld <- ICcalib:::CalcVarNpmleRS(tm = obs.tm, event = delta, w = w.bld , w.res = w.res.bld, BS = 1000)
+boot.np.bld <- ICcalib::CalcVarNpmle(tm = obs.tm, event = delta, w = w.bld , w.res = w.res.bld, BS = 1000)
+boot.np.rs.bld <- ICcalib::CalcVarNpmleRS(tm = obs.tm, event = delta, w = w.bld , w.res = w.res.bld, BS = 1000)
 var.beta.np.bld <- boot.np.bld$v
 var.beta.np.rs.bld <- boot.np.rs.bld$v
 ci.beta.boot.np.bld <- boot.np.bld$ci
@@ -132,15 +135,15 @@ out.bld[4 , 4] <-  paste0("(", round(exp(ci.beta.boot.np.rs.bld[1]), 2), ", ", r
 ######### Analysis of  CMV **urine** shedding and CMV diagnosis ##########
 
 # Create datasets for the naive methods
-df.lvcf.urn <-   LVCFdata(w = w.urn, w.res = w.res.urn, obs.tm = obs.tm, delta = delta)
-df.midI.urn <-   MidIdata(w = w.urn, w.res = w.res.urn, obs.tm = obs.tm, delta = delta)
+df.lvcf.urn <-   ICcalib:::LVCFdata(w = w.urn, w.res = w.res.urn, obs.tm = obs.tm, delta = delta)
+df.midI.urn <-   ICcalib:::MidIdata(w = w.urn, w.res = w.res.urn, obs.tm = obs.tm, delta = delta)
 
 # LVCF +  MidI model fitting
 fit.lvcf.urn <- survival::coxph(survival::Surv(start.time, stop.time, delta) ~ X, data = df.lvcf.urn)
 fit.midI.urn <- survival::coxph(survival::Surv(start.time, stop.time, delta) ~ X, data = df.midI.urn)
 
 ## Calibration model
-fit.npmle.urn <- FitCalibNpmle(w = w.urn, w.res = w.res.urn)
+fit.npmle.urn <- ICcalib::FitCalibNpmle(w = w.urn, w.res = w.res.urn)
 
 ## Calculate probability matrices. These matrices represent P(X(t)=1|history) using different estimators.
 # Number of rows: number of cases , number of columns: sample size. So these probabilities are calculated for all the sample at each case time
@@ -157,8 +160,8 @@ all.est.urn <- c(est.lvcf.urn, est.midI.urn, est.np.urn, est.np.calib.rs.urn)
 all.est.urn %>% round(2)
 
 ### SE, p-values, CIs, and final results' table 
-boot.np.urn <- ICcalib:::CalcVarNpmle(tm = obs.tm, event = delta, w = w.urn , w.res = w.res.urn, BS = 1000)
-boot.np.rs.urn <- ICcalib:::CalcVarNpmleRS(tm = obs.tm, event = delta, w = w.urn , w.res = w.res.urn, BS = 1000)
+boot.np.urn <- ICcalib::CalcVarNpmle(tm = obs.tm, event = delta, w = w.urn , w.res = w.res.urn, BS = 1000)
+boot.np.rs.urn <- ICcalib::CalcVarNpmleRS(tm = obs.tm, event = delta, w = w.urn , w.res = w.res.urn, BS = 1000)
 var.beta.np.urn <- boot.np.urn$v
 var.beta.np.rs.urn <- boot.np.rs.urn$v
 ci.beta.boot.np.urn <- boot.np.urn$ci
