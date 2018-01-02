@@ -10,16 +10,23 @@ IterSimCox <- function(n.sample, mu, lambda, alpha, beta0, n.points, gamma.z, ga
   n.cases <- length(case.times)
   w <- my.data$w
   w.res <- my.data$w.res
+  
   ##### Naive methods ########
+  
   #### Create data frame with time-dependent covariate suitable for coxph (for naive methods, see LVCFdata and MIdIdata) #######
+  
   df.lvcf <- ICcalib:::LVCFdata(w = w, w.res = w.res, obs.tm = obs.tm, delta = delta, Z = Z)
   df.midI <- ICcalib:::MidIdata(w = w, w.res = w.res, obs.tm = obs.tm, delta = delta, Z = Z)
+  
   fit.lvcf <- survival::coxph(survival::Surv(start.time, stop.time, delta) ~ X + Z1 + Z2 + Z3, data = df.lvcf)
   fit.midI <- survival::coxph(survival::Surv(start.time, stop.time, delta) ~ X + Z1 + Z2 + Z3, data = df.midI)
+  
   est.lvcf <- coef(fit.lvcf)
   est.midI <- coef(fit.midI)
+  
   var.lvcf <- diag(fit.lvcf$var)
   var.midI <- diag(fit.midI$var)
+  
   ##### Fit calibration and risk set calibration models and then calculate P(X(t)=1|history)       ############
   ###### for each person in the risk set, for all risk sets                                        ############
   cox.hz.times <- sort(unique(obs.tm))
@@ -50,6 +57,7 @@ IterSimCox <- function(n.sample, mu, lambda, alpha, beta0, n.points, gamma.z, ga
     var.cox <- diag(ICcalib:::CalcVarParam(theta = est.cox, tm = obs.tm, event = delta, Z = Z, Q = Q,
                             ps = px.cox, ps.deriv = px.cox.deriv, w = w, w.res = w.res, fit.cox = fit.cox))
     }}
+  ##
   est.cox.rs.fail <- 0
   if (fit.cox.rs.ints.fail==0) {
   px.cox.rs.ints <- t(sapply(case.times, ICcalib:::CalcCoxCalibRSIntsP, w = w, w.res =  w.res, fit.cox.rs.ints = fit.cox.rs.ints, 
@@ -68,11 +76,14 @@ IterSimCox <- function(n.sample, mu, lambda, alpha, beta0, n.points, gamma.z, ga
     var.cox.rs <- diag(var.cox.rs.ints)
     }
   }
-  # Returns a vector
-  return.vec <- c(n.sample, mu, lambda, alpha,  beta0, n.points, n.cases, # design parameters
-                  est.lvcf, est.midI, est.cox, est.cox.rs, # parameter estimates 
-                  var.lvcf, var.midI, var.cox, var.cox.rs) #variance estimates
-  #CI using estimated variance can be calculated when summarizing data
+  ###
+  
+  
+  # Returns a lot of things: first row are design parameters, second row are parameter estimates 
+  # third row are variance estimates, CI using estimated variance can be calculated when summarizing data
+  return.vec <- c(n.sample, mu, lambda, alpha,  beta0, n.points, n.cases, 
+                  est.lvcf, est.midI, est.cox, est.cox.rs,
+                  var.lvcf, var.midI, var.cox, var.cox.rs)
   return(return.vec)
 }
 
