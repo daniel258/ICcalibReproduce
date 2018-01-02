@@ -7,7 +7,6 @@
 
 rm(list = ls())
 
-devtools::install_github("daniel258/ICcalib")
 library(ICcalib)
 packageVersion("ICcalib")
 #[1] ‘1.0.5’
